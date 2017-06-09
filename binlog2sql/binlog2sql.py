@@ -9,7 +9,7 @@ from pymysqlreplication.row_event import (
     UpdateRowsEvent,
     DeleteRowsEvent,
 )
-from pymysqlreplication.event import QueryEvent, RotateEvent, FormatDescriptionEvent
+from pymysqlreplication.event import QueryEvent, RotateEvent, FormatDescriptionEvent, XidEvent
 from binlog2sql_util import command_line_args, concat_sql_from_binlogevent, create_unique_file, reversed_lines
 
 class Binlog2sql(object):
@@ -80,10 +80,11 @@ class Binlog2sql(object):
                     # else:
                     #     raise ValueError('unknown binlog file or position')
 
-                if isinstance(binlogevent, QueryEvent) and binlogevent.query == 'BEGIN':
-                    eStartPos = lastPos
+                # if isinstance(binlogevent, RotateEvent):
+                #     self.startPos = binlogevent.position
+                #     self.
 
-                if isinstance(binlogevent, QueryEvent):
+                if isinstance(binlogevent, QueryEvent) or isinstance(binlogevent, XidEvent):
                     sql = concat_sql_from_binlogevent(cursor=cur, binlogevent=binlogevent, flashback=self.flashback, nopk=self.nopk)
                     if sql:
                         print sql

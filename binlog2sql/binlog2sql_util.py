@@ -9,7 +9,7 @@ from pymysqlreplication.row_event import (
     UpdateRowsEvent,
     DeleteRowsEvent,
 )
-from pymysqlreplication.event import QueryEvent, RotateEvent, FormatDescriptionEvent
+from pymysqlreplication.event import QueryEvent, RotateEvent, FormatDescriptionEvent, GtidEvent, XidEvent
 
 
 def is_valid_datetime(string):
@@ -109,17 +109,18 @@ def fix_object(value):
 def concat_sql_from_binlogevent(cursor, binlogevent, row=None, eStartPos=None, flashback=False, nopk=False):
     if flashback and nopk:
         raise ValueError('only one of flashback or nopk can be True')
-    if not (isinstance(binlogevent, WriteRowsEvent) or isinstance(binlogevent, UpdateRowsEvent) or isinstance(binlogevent, DeleteRowsEvent) or isinstance(binlogevent, QueryEvent)):
-        raise ValueError('binlogevent must be WriteRowsEvent, UpdateRowsEvent, DeleteRowsEvent or QueryEvent')
+    if not (isinstance(binlogevent, WriteRowsEvent) or isinstance(binlogevent, UpdateRowsEvent) or isinstance(binlogevent, DeleteRowsEvent) or isinstance(binlogevent, QueryEvent) or isinstance(binlogevent, XidEvent)):
+        return ''
 
     sql = ''
     if isinstance(binlogevent, WriteRowsEvent) or isinstance(binlogevent, UpdateRowsEvent) or isinstance(binlogevent, DeleteRowsEvent):
         pattern = generate_sql_pattern(binlogevent, row=row, flashback=flashback, nopk=nopk)
         sql = cursor.mogrify(pattern['template'], pattern['values'])
         sql += ' #start %s end %s time %s' % (eStartPos, binlogevent.packet.log_pos, datetime.datetime.fromtimestamp(binlogevent.timestamp))
-    elif flashback is False and isinstance(binlogevent, QueryEvent) and binlogevent.query != 'BEGIN' and binlogevent.query != 'COMMIT':
-        if binlogevent.schema:
-            sql = 'USE {0};\n'.format(binlogevent.schema)
+    # elif flashback is False and isinstance(binlogevent, QueryEvent) and binlogevent.query != 'BEGIN' and binlogevent.query != 'COMMIT':
+    elif isinstance(binlogevent, XidEvent):
+        sql += 'COMMIT;'
+    else:
         sql += '{0};'.format(fix_object(binlogevent.query))
 
     return sql
